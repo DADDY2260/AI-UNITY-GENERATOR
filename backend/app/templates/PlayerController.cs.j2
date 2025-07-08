@@ -1,0 +1,163 @@
+using UnityEngine;
+
+/// <summary>
+/// PlayerController - Handles player movement and input
+/// Generated for: {{ game_idea }}
+/// </summary>
+public class PlayerController : MonoBehaviour
+{
+    [Header("Movement Settings")]
+    public float moveSpeed = 5f;
+    public float jumpForce = 10f;
+    {% if has_double_jump %}
+    public float doubleJumpForce = 8f;
+    public int maxJumps = 2;
+    {% endif %}
+    
+    [Header("Ground Check")]
+    public Transform groundCheck;
+    public float groundCheckRadius = 0.2f;
+    public LayerMask groundLayer = 1;
+    
+    // Private variables
+    private Rigidbody2D rb;
+    private bool isGrounded;
+    {% if has_double_jump %}
+    private int jumpsRemaining;
+    {% endif %}
+    private float horizontalInput;
+    
+    // Animation (if you have an Animator)
+    private Animator animator;
+    
+    void Start()
+    {
+        rb = GetComponent<Rigidbody2D>();
+        animator = GetComponent<Animator>();
+        {% if has_double_jump %}
+        jumpsRemaining = maxJumps;
+        {% endif %}
+        
+        // Create ground check if not assigned
+        if (groundCheck == null)
+        {
+            GameObject check = new GameObject("GroundCheck");
+            check.transform.SetParent(transform);
+            check.transform.localPosition = new Vector3(0, -0.5f, 0);
+            groundCheck = check.transform;
+        }
+    }
+    
+    void Update()
+    {
+        // Get input
+        horizontalInput = Input.GetAxisRaw("Horizontal");
+        
+        // Check if grounded
+        isGrounded = Physics2D.OverlapCircle(groundCheck.position, groundCheckRadius, groundLayer);
+        
+        {% if has_double_jump %}
+        // Reset jumps when grounded
+        if (isGrounded)
+        {
+            jumpsRemaining = maxJumps;
+        }
+        {% endif %}
+        
+        // Jump input
+        if (Input.GetButtonDown("Jump"))
+        {
+            {% if has_double_jump %}
+            if (isGrounded)
+            {
+                Jump(jumpForce);
+                jumpsRemaining--;
+            }
+            else if (jumpsRemaining > 0)
+            {
+                Jump(doubleJumpForce);
+                jumpsRemaining--;
+            }
+            {% else %}
+            if (isGrounded)
+            {
+                Jump(jumpForce);
+            }
+            {% endif %}
+        }
+        
+        // Update animations
+        UpdateAnimations();
+    }
+    
+    void FixedUpdate()
+    {
+        // Move horizontally
+        Move();
+    }
+    
+    void Move()
+    {
+        Vector2 velocity = rb.velocity;
+        velocity.x = horizontalInput * moveSpeed;
+        rb.velocity = velocity;
+        
+        // Flip sprite based on direction
+        if (horizontalInput != 0)
+        {
+            transform.localScale = new Vector3(
+                Mathf.Sign(horizontalInput), 
+                1, 
+                1
+            );
+        }
+    }
+    
+    void Jump(float force)
+    {
+        rb.velocity = new Vector2(rb.velocity.x, force);
+        
+        // Play jump sound if you have one
+        // AudioManager.Instance.PlaySound("jump");
+    }
+    
+    void UpdateAnimations()
+    {
+        if (animator != null)
+        {
+            // Set animation parameters
+            animator.SetFloat("Speed", Mathf.Abs(horizontalInput));
+            animator.SetBool("IsGrounded", isGrounded);
+            {% if has_double_jump %}
+            animator.SetInteger("JumpsRemaining", jumpsRemaining);
+            {% endif %}
+        }
+    }
+    
+    // Visualize ground check in editor
+    void OnDrawGizmosSelected()
+    {
+        if (groundCheck != null)
+        {
+            Gizmos.color = isGrounded ? Color.green : Color.red;
+            Gizmos.DrawWireSphere(groundCheck.position, groundCheckRadius);
+        }
+    }
+    
+    {% if has_collectibles %}
+    // Handle collectible pickup
+    void OnTriggerEnter2D(Collider2D other)
+    {
+        if (other.CompareTag("Collectible"))
+        {
+            Collectible collectible = other.GetComponent<Collectible>();
+            if (collectible != null)
+            {
+                collectible.Collect();
+                // Update score or inventory
+                GameManager.Instance.AddScore(collectible.pointValue);
+            }
+        }
+    }
+    {% endif %}
+} 

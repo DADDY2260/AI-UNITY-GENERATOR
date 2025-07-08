@@ -1,0 +1,43 @@
+using UnityEngine;
+
+/// <summary>
+/// {{ script_name }} - Basic script template
+/// Generated for: {{ game_idea }}
+/// </summary>
+public class {{ script_name }} : MonoBehaviour
+{
+    [Header("Settings")]
+    public bool isActive = true;
+    
+    // Private variables
+    private bool isInitialized = false;
+    
+    void Start()
+    {
+        Initialize();
+    }
+    
+    void Update()
+    {
+        if (!isActive || !isInitialized) return;
+        
+        // Add your update logic here
+    }
+    
+    void Initialize()
+    {
+        isInitialized = true;
+        Debug.Log($"{{ script_name }} initialized for: {{ game_idea }}");
+    }
+    
+    // Public methods
+    public void SetActive(bool active)
+    {
+        isActive = active;
+    }
+    
+    public bool IsActive()
+    {
+        return isActive;
+    }
+} 

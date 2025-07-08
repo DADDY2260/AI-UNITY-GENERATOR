@@ -1,0 +1,298 @@
+using UnityEngine;
+
+/// <summary>
+/// EnemyAI - Handles enemy behavior and AI patterns
+/// Generated for: {{ game_idea }}
+/// </summary>
+public class EnemyAI : MonoBehaviour
+{
+    [Header("Movement Settings")]
+    public float moveSpeed = 2f;
+    public float patrolDistance = 5f;
+    public float chaseDistance = 8f;
+    public float attackDistance = 1.5f;
+    
+    [Header("Combat Settings")]
+    public int damage = 10;
+    public float attackCooldown = 1f;
+    public int maxHealth = 30;
+    
+    [Header("AI Behavior")]
+    public bool canPatrol = true;
+    public bool canChase = true;
+    public bool canAttack = true;
+    public LayerMask playerLayer = 1;
+    public LayerMask groundLayer = 1;
+    
+    [Header("Visual")]
+    public SpriteRenderer spriteRenderer;
+    public Color normalColor = Color.white;
+    public Color chaseColor = Color.red;
+    public Color attackColor = Color.yellow;
+    
+    // Private variables
+    private Transform player;
+    private Rigidbody2D rb;
+    private Vector3 startPosition;
+    private Vector3 patrolTarget;
+    private float lastAttackTime;
+    private int currentHealth;
+    private bool isDead = false;
+    
+    // AI states
+    private enum AIState { Patrol, Chase, Attack, Dead }
+    private AIState currentState = AIState.Patrol;
+    
+    void Start()
+    {
+        rb = GetComponent<Rigidbody2D>();
+        player = GameObject.FindGameObjectWithTag("Player")?.transform;
+        startPosition = transform.position;
+        currentHealth = maxHealth;
+        
+        // Set initial patrol target
+        SetNewPatrolTarget();
+        
+        // Get sprite renderer if not assigned
+        if (spriteRenderer == null)
+        {
+            spriteRenderer = GetComponent<SpriteRenderer>();
+        }
+    }
+    
+    void Update()
+    {
+        if (isDead) return;
+        
+        // Check for player
+        if (player != null)
+        {
+            float distanceToPlayer = Vector2.Distance(transform.position, player.position);
+            
+            // State machine
+            switch (currentState)
+            {
+                case AIState.Patrol:
+                    Patrol();
+                    if (canChase && distanceToPlayer <= chaseDistance)
+                    {
+                        currentState = AIState.Chase;
+                    }
+                    break;
+                    
+                case AIState.Chase:
+                    ChasePlayer();
+                    if (distanceToPlayer > chaseDistance)
+                    {
+                        currentState = AIState.Patrol;
+                    }
+                    else if (canAttack && distanceToPlayer <= attackDistance)
+                    {
+                        currentState = AIState.Attack;
+                    }
+                    break;
+                    
+                case AIState.Attack:
+                    AttackPlayer();
+                    if (distanceToPlayer > attackDistance)
+                    {
+                        currentState = AIState.Chase;
+                    }
+                    break;
+            }
+        }
+        else
+        {
+            // No player found, go back to patrol
+            currentState = AIState.Patrol;
+            Patrol();
+        }
+        
+        // Update visual state
+        UpdateVisualState();
+    }
+    
+    void Patrol()
+    {
+        if (!canPatrol) return;
+        
+        // Move towards patrol target
+        Vector3 direction = (patrolTarget - transform.position).normalized;
+        rb.velocity = new Vector2(direction.x * moveSpeed, rb.velocity.y);
+        
+        // Flip sprite based on direction
+        if (direction.x != 0)
+        {
+            transform.localScale = new Vector3(Mathf.Sign(direction.x), 1, 1);
+        }
+        
+        // Check if reached patrol target
+        if (Vector2.Distance(transform.position, patrolTarget) < 0.5f)
+        {
+            SetNewPatrolTarget();
+        }
+    }
+    
+    void ChasePlayer()
+    {
+        if (!canChase || player == null) return;
+        
+        // Move towards player
+        Vector3 direction = (player.position - transform.position).normalized;
+        rb.velocity = new Vector2(direction.x * moveSpeed * 1.5f, rb.velocity.y);
+        
+        // Flip sprite based on direction
+        if (direction.x != 0)
+        {
+            transform.localScale = new Vector3(Mathf.Sign(direction.x), 1, 1);
+        }
+    }
+    
+    void AttackPlayer()
+    {
+        if (!canAttack || player == null) return;
+        
+        // Stop moving
+        rb.velocity = new Vector2(0, rb.velocity.y);
+        
+        // Attack if cooldown is ready
+        if (Time.time - lastAttackTime >= attackCooldown)
+        {
+            PerformAttack();
+            lastAttackTime = Time.time;
+        }
+    }
+    
+    void PerformAttack()
+    {
+        // Deal damage to player
+        PlayerController playerController = player.GetComponent<PlayerController>();
+        if (playerController != null)
+        {
+            // You might want to add a TakeDamage method to PlayerController
+            // playerController.TakeDamage(damage);
+        }
+        
+        // Play attack animation or effect
+        // animator.SetTrigger("Attack");
+    }
+    
+    void SetNewPatrolTarget()
+    {
+        // Set a random patrol target within patrol distance
+        float randomX = Random.Range(-patrolDistance, patrolDistance);
+        patrolTarget = startPosition + new Vector3(randomX, 0, 0);
+    }
+    
+    void UpdateVisualState()
+    {
+        if (spriteRenderer == null) return;
+        
+        switch (currentState)
+        {
+            case AIState.Patrol:
+                spriteRenderer.color = normalColor;
+                break;
+            case AIState.Chase:
+                spriteRenderer.color = chaseColor;
+                break;
+            case AIState.Attack:
+                spriteRenderer.color = attackColor;
+                break;
+            case AIState.Dead:
+                spriteRenderer.color = Color.gray;
+                break;
+        }
+    }
+    
+    public void TakeDamage(int damage)
+    {
+        if (isDead) return;
+        
+        currentHealth -= damage;
+        
+        // Visual feedback
+        if (spriteRenderer != null)
+        {
+            StartCoroutine(FlashRed());
+        }
+        
+        // Check if dead
+        if (currentHealth <= 0)
+        {
+            Die();
+        }
+    }
+    
+    System.Collections.IEnumerator FlashRed()
+    {
+        Color originalColor = spriteRenderer.color;
+        spriteRenderer.color = Color.red;
+        yield return new WaitForSeconds(0.1f);
+        spriteRenderer.color = originalColor;
+    }
+    
+    void Die()
+    {
+        isDead = true;
+        currentState = AIState.Dead;
+        
+        // Stop movement
+        rb.velocity = Vector2.zero;
+        
+        // Disable collider
+        Collider2D collider = GetComponent<Collider2D>();
+        if (collider != null)
+        {
+            collider.enabled = false;
+        }
+        
+        // Add score to player
+        if (GameManager.Instance != null)
+        {
+            GameManager.Instance.AddScore(50); // Points for killing enemy
+        }
+        
+        // Destroy after delay
+        Destroy(gameObject, 2f);
+    }
+    
+    // Visualize AI ranges in editor
+    void OnDrawGizmosSelected()
+    {
+        Gizmos.color = Color.yellow;
+        Gizmos.DrawWireSphere(transform.position, patrolDistance);
+        
+        Gizmos.color = Color.red;
+        Gizmos.DrawWireSphere(transform.position, chaseDistance);
+        
+        Gizmos.color = Color.blue;
+        Gizmos.DrawWireSphere(transform.position, attackDistance);
+    }
+    
+    // Public methods for external control
+    public void SetMoveSpeed(float speed)
+    {
+        moveSpeed = speed;
+    }
+    
+    public void SetChaseDistance(float distance)
+    {
+        chaseDistance = distance;
+    }
+    
+    public void SetAttackDistance(float distance)
+    {
+        attackDistance = distance;
+    }
+    
+    public int GetCurrentHealth()
+    {
+        return currentHealth;
+    }
+    
+    public bool IsDead()
+    {
+        return isDead;
+    }
+} 

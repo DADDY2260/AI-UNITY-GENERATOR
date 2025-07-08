@@ -1,0 +1,296 @@
+using UnityEngine;
+using UnityEngine.SceneManagement;
+
+/// <summary>
+/// LevelManager - Manages level progression and level-specific data
+/// Generated for: {{ game_idea }}
+/// </summary>
+public class LevelManager : MonoBehaviour
+{
+    [Header("Level Settings")]
+    public string[] levelScenes = { "Level1", "Level2", "Level3", "Level4", "Level5" };
+    public int currentLevelIndex = 0;
+    public bool unlockAllLevels = false; // For testing
+    
+    [Header("Level Data")]
+    public LevelData[] levelData;
+    
+    [Header("UI References")]
+    public GameObject levelCompletePanel;
+    public GameObject levelFailedPanel;
+    public UnityEngine.UI.Text levelTitleText;
+    public UnityEngine.UI.Text levelDescriptionText;
+    
+    // Events
+    public System.Action<int> OnLevelStart;
+    public System.Action<int> OnLevelComplete;
+    public System.Action<int> OnLevelFailed;
+    
+    // Private variables
+    private bool isLevelComplete = false;
+    private bool isLevelFailed = false;
+    private GameManager gameManager;
+    
+    [System.Serializable]
+    public class LevelData
+    {
+        public string levelName;
+        public string description;
+        public int targetScore;
+        public float timeLimit = 0f; // 0 = no time limit
+        public int collectiblesRequired = 0;
+        public bool isUnlocked = true;
+    }
+    
+    void Start()
+    {
+        gameManager = GameManager.Instance;
+        
+        // Initialize level data if not set
+        if (levelData == null || levelData.Length == 0)
+        {
+            InitializeDefaultLevelData();
+        }
+        
+        // Subscribe to game events
+        if (gameManager != null)
+        {
+            gameManager.OnGameOver += OnGameOver;
+            {% if has_multiple_levels %}
+            gameManager.OnLevelComplete += OnLevelComplete;
+            {% endif %}
+        }
+        
+        // Start current level
+        StartLevel(currentLevelIndex);
+    }
+    
+    void InitializeDefaultLevelData()
+    {
+        levelData = new LevelData[levelScenes.Length];
+        for (int i = 0; i < levelScenes.Length; i++)
+        {
+            levelData[i] = new LevelData
+            {
+                levelName = $"Level {i + 1}",
+                description = $"Complete level {i + 1}",
+                targetScore = 100 * (i + 1),
+                timeLimit = 0f,
+                collectiblesRequired = 0,
+                isUnlocked = i == 0 || unlockAllLevels
+            };
+        }
+    }
+    
+    public void StartLevel(int levelIndex)
+    {
+        if (levelIndex < 0 || levelIndex >= levelScenes.Length) return;
+        
+        currentLevelIndex = levelIndex;
+        isLevelComplete = false;
+        isLevelFailed = false;
+        
+        // Update UI
+        UpdateLevelUI();
+        
+        // Trigger level start event
+        OnLevelStart?.Invoke(levelIndex);
+        
+        // Load level scene if different
+        string currentScene = SceneManager.GetActiveScene().name;
+        if (currentScene != levelScenes[levelIndex])
+        {
+            SceneManager.LoadScene(levelScenes[levelIndex]);
+        }
+    }
+    
+    public void CompleteLevel()
+    {
+        if (isLevelComplete || isLevelFailed) return;
+        
+        isLevelComplete = true;
+        
+        // Mark level as completed in save data
+        PlayerPrefs.SetInt($"Level_{currentLevelIndex}_Completed", 1);
+        
+        // Unlock next level
+        if (currentLevelIndex + 1 < levelScenes.Length)
+        {
+            PlayerPrefs.SetInt($"Level_{currentLevelIndex + 1}_Unlocked", 1);
+            levelData[currentLevelIndex + 1].isUnlocked = true;
+        }
+        
+        // Show level complete UI
+        ShowLevelCompleteUI();
+        
+        // Trigger event
+        OnLevelComplete?.Invoke(currentLevelIndex);
+    }
+    
+    public void FailLevel()
+    {
+        if (isLevelComplete || isLevelFailed) return;
+        
+        isLevelFailed = true;
+        
+        // Show level failed UI
+        ShowLevelFailedUI();
+        
+        // Trigger event
+        OnLevelFailed?.Invoke(currentLevelIndex);
+    }
+    
+    public void NextLevel()
+    {
+        if (currentLevelIndex + 1 < levelScenes.Length)
+        {
+            StartLevel(currentLevelIndex + 1);
+        }
+        else
+        {
+            // Game completed!
+            GameCompleted();
+        }
+    }
+    
+    public void RestartLevel()
+    {
+        StartLevel(currentLevelIndex);
+    }
+    
+    public void LoadMainMenu()
+    {
+        SceneManager.LoadScene("MainMenu");
+    }
+    
+    void GameCompleted()
+    {
+        // Show game completion UI
+        Debug.Log("Congratulations! You've completed the game!");
+        
+        // You might want to show a special completion screen
+        // or return to main menu
+        LoadMainMenu();
+    }
+    
+    void UpdateLevelUI()
+    {
+        if (levelTitleText != null && currentLevelIndex < levelData.Length)
+        {
+            levelTitleText.text = levelData[currentLevelIndex].levelName;
+        }
+        
+        if (levelDescriptionText != null && currentLevelIndex < levelData.Length)
+        {
+            levelDescriptionText.text = levelData[currentLevelIndex].description;
+        }
+    }
+    
+    void ShowLevelCompleteUI()
+    {
+        if (levelCompletePanel != null)
+        {
+            levelCompletePanel.SetActive(true);
+        }
+    }
+    
+    void ShowLevelFailedUI()
+    {
+        if (levelFailedPanel != null)
+        {
+            levelFailedPanel.SetActive(true);
+        }
+    }
+    
+    // Event handlers
+    void OnGameOver()
+    {
+        // Check if player won or lost based on current level requirements
+        if (gameManager != null)
+        {
+            int currentScore = gameManager.GetCurrentScore();
+            LevelData currentLevel = levelData[currentLevelIndex];
+            
+            if (currentScore >= currentLevel.targetScore)
+            {
+                CompleteLevel();
+            }
+            else
+            {
+                FailLevel();
+            }
+        }
+    }
+    
+    {% if has_multiple_levels %}
+    void OnLevelComplete()
+    {
+        // This is called when GameManager completes a level
+        CompleteLevel();
+    }
+    {% endif %}
+    
+    // Public getters
+    public int GetCurrentLevelIndex() => currentLevelIndex;
+    public LevelData GetCurrentLevelData() => levelData[currentLevelIndex];
+    public bool IsLevelComplete() => isLevelComplete;
+    public bool IsLevelFailed() => isLevelFailed;
+    
+    // Level unlocking methods
+    public bool IsLevelUnlocked(int levelIndex)
+    {
+        if (levelIndex < 0 || levelIndex >= levelData.Length) return false;
+        return levelData[levelIndex].isUnlocked;
+    }
+    
+    public void UnlockLevel(int levelIndex)
+    {
+        if (levelIndex >= 0 && levelIndex < levelData.Length)
+        {
+            levelData[levelIndex].isUnlocked = true;
+            PlayerPrefs.SetInt($"Level_{levelIndex}_Unlocked", 1);
+        }
+    }
+    
+    public void LockLevel(int levelIndex)
+    {
+        if (levelIndex >= 0 && levelIndex < levelData.Length)
+        {
+            levelData[levelIndex].isUnlocked = false;
+            PlayerPrefs.SetInt($"Level_{levelIndex}_Unlocked", 0);
+        }
+    }
+    
+    // Save/Load methods
+    public void SaveLevelProgress()
+    {
+        PlayerPrefs.SetInt("CurrentLevel", currentLevelIndex);
+        PlayerPrefs.Save();
+    }
+    
+    public void LoadLevelProgress()
+    {
+        currentLevelIndex = PlayerPrefs.GetInt("CurrentLevel", 0);
+        
+        // Load unlocked levels
+        for (int i = 0; i < levelData.Length; i++)
+        {
+            if (PlayerPrefs.GetInt($"Level_{i}_Unlocked", 0) == 1)
+            {
+                levelData[i].isUnlocked = true;
+            }
+        }
+    }
+    
+    void OnDestroy()
+    {
+        // Unsubscribe from events
+        if (gameManager != null)
+        {
+            gameManager.OnGameOver -= OnGameOver;
+            {% if has_multiple_levels %}
+            gameManager.OnLevelComplete -= OnLevelComplete;
+            {% endif %}
+        }
+    }
+} 
