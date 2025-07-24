@@ -1,0 +1,155 @@
+using UnityEngine;
+
+/// <summary>
+/// Collectible - Handles collectible item behavior
+/// Generated for: A 3D shooter game
+/// </summary>
+public class Collectible : MonoBehaviour
+{
+    [Header("Collectible Settings")]
+    public int pointValue = 10;
+    public string collectibleType = "gem";
+    public bool destroyOnCollect = true;
+    
+    [Header("Visual Effects")]
+    public GameObject collectEffect;
+    public AudioClip collectSound;
+    public float rotationSpeed = 90f;
+    public float bobSpeed = 2f;
+    public float bobHeight = 0.5f;
+    
+    [Header("Animation")]
+    public bool useAnimation = true;
+    public float pulseSpeed = 1f;
+    public float pulseScale = 1.2f;
+    
+    // Private variables
+    private Vector3 startPosition;
+    private float bobTime = 0f;
+    private float pulseTime = 0f;
+    private SpriteRenderer spriteRenderer;
+    private AudioSource audioSource;
+    
+    void Start()
+    {
+        startPosition = transform.position;
+        spriteRenderer = GetComponent<SpriteRenderer>();
+        audioSource = GetComponent<AudioSource>();
+        
+        // Add audio source if not present
+        if (audioSource == null && collectSound != null)
+        {
+            audioSource = gameObject.AddComponent<AudioSource>();
+        }
+        
+        // Set tag for collision detection
+        gameObject.tag = "Collectible";
+    }
+    
+    void Update()
+    {
+        // Rotate the collectible
+        transform.Rotate(0, 0, rotationSpeed * Time.deltaTime);
+        
+        // Bob up and down
+        bobTime += Time.deltaTime * bobSpeed;
+        float newY = startPosition.y + Mathf.Sin(bobTime) * bobHeight;
+        transform.position = new Vector3(transform.position.x, newY, transform.position.z);
+        
+        // Pulse animation
+        if (useAnimation)
+        {
+            pulseTime += Time.deltaTime * pulseSpeed;
+            float scale = 1f + Mathf.Sin(pulseTime) * (pulseScale - 1f) * 0.5f;
+            transform.localScale = new Vector3(scale, scale, 1f);
+        }
+    }
+    
+    public void Collect()
+    {
+        // Play collect sound
+        if (audioSource != null && collectSound != null)
+        {
+            audioSource.PlayOneShot(collectSound);
+        }
+        
+        // Spawn collect effect
+        if (collectEffect != null)
+        {
+            Instantiate(collectEffect, transform.position, Quaternion.identity);
+        }
+        
+        // Add score to game manager
+        if (GameManager.Instance != null)
+        {
+            GameManager.Instance.AddScore(pointValue);
+        }
+        
+        // Update UI if it exists
+        UIManager uiManager = FindObjectOfType<UIManager>();
+        if (uiManager != null)
+        {
+            // You might want to track collectibles count
+            // uiManager.UpdateCollectibles(collectiblesCount);
+        }
+        
+        // Destroy the collectible
+        if (destroyOnCollect)
+        {
+            Destroy(gameObject);
+        }
+        else
+        {
+            // Disable the collectible but keep it for respawn
+            gameObject.SetActive(false);
+        }
+    }
+    
+    // Alternative collection method via trigger
+    void OnTriggerEnter2D(Collider2D other)
+    {
+        if (other.CompareTag("Player"))
+        {
+            Collect();
+        }
+    }
+    
+    // Visual feedback when player is near
+    void OnTriggerStay2D(Collider2D other)
+    {
+        if (other.CompareTag("Player") && spriteRenderer != null)
+        {
+            // Glow effect when player is near
+            spriteRenderer.color = Color.yellow;
+        }
+    }
+    
+    void OnTriggerExit2D(Collider2D other)
+    {
+        if (other.CompareTag("Player") && spriteRenderer != null)
+        {
+            // Reset color when player leaves
+            spriteRenderer.color = Color.white;
+        }
+    }
+    
+    // Public methods for external control
+    public void SetPointValue(int value)
+    {
+        pointValue = value;
+    }
+    
+    public void SetCollectibleType(string type)
+    {
+        collectibleType = type;
+    }
+    
+    public void Respawn()
+    {
+        if (!destroyOnCollect)
+        {
+            gameObject.SetActive(true);
+            transform.position = startPosition;
+        }
+    }
+} 

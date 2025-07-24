@@ -1,0 +1,58 @@
+using UnityEngine;
+
+/// <summary>
+/// PlayerController3D - Handles 3D player movement and input
+/// Generated for: An FPS game where youre a military personal fighting a war
+/// </summary>
+[RequireComponent(typeof(Rigidbody))]
+public class PlayerController3D : MonoBehaviour
+{
+    public float moveSpeed = 6f;
+    public float jumpForce = 8f;
+    public float gravity = -9.81f;
+    public Transform groundCheck;
+    public float groundDistance = 0.4f;
+    public LayerMask groundMask;
+
+    private Rigidbody rb;
+    private bool isGrounded;
+    private Vector3 velocity;
+
+    void Start()
+    {
+        rb = GetComponent<Rigidbody>();
+        if (groundCheck == null)
+        {
+            GameObject check = new GameObject("GroundCheck");
+            check.transform.SetParent(transform);
+            check.transform.localPosition = new Vector3(0, -1f, 0);
+            groundCheck = check.transform;
+        }
+    }
+
+    void Update()
+    {
+        // Ground check
+        isGrounded = Physics.CheckSphere(groundCheck.position, groundDistance, groundMask);
+        if (isGrounded && velocity.y < 0)
+        {
+            velocity.y = -2f;
+        }
+
+        // Input
+        float x = Input.GetAxis("Horizontal");
+        float z = Input.GetAxis("Vertical");
+        Vector3 move = transform.right * x + transform.forward * z;
+        rb.MovePosition(transform.position + move * moveSpeed * Time.deltaTime);
+
+        // Jump
+        if (Input.GetButtonDown("Jump") && isGrounded)
+        {
+            velocity.y = Mathf.Sqrt(jumpForce * -2f * gravity);
+        }
+
+        // Apply gravity
+        velocity.y += gravity * Time.deltaTime;
+        rb.MovePosition(transform.position + new Vector3(0, velocity.y * Time.deltaTime, 0));
+    }
+} 

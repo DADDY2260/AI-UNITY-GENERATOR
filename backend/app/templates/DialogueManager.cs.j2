@@ -1,0 +1,65 @@
+using UnityEngine;
+using UnityEngine.UI;
+using System.Collections;
+
+/// <summary>
+/// DialogueManager - Handles dialogue and cutscenes
+/// Generated for: {{ game_idea }}
+/// </summary>
+public class DialogueManager : MonoBehaviour
+{
+    public Text dialogueText;
+    public GameObject dialoguePanel;
+    public string[] dialogueLines;
+    public float textSpeed = 0.05f;
+    private int currentLine = 0;
+    private bool isTyping = false;
+
+    void Start()
+    {
+        if (dialoguePanel != null)
+            dialoguePanel.SetActive(false);
+    }
+
+    public void StartDialogue(string[] lines)
+    {
+        dialogueLines = lines;
+        currentLine = 0;
+        if (dialoguePanel != null)
+            dialoguePanel.SetActive(true);
+        StartCoroutine(TypeLine());
+    }
+
+    IEnumerator TypeLine()
+    {
+        isTyping = true;
+        dialogueText.text = "";
+        foreach (char c in dialogueLines[currentLine].ToCharArray())
+        {
+            dialogueText.text += c;
+            yield return new WaitForSeconds(textSpeed);
+        }
+        isTyping = false;
+    }
+
+    public void NextLine()
+    {
+        if (isTyping) return;
+        if (currentLine < dialogueLines.Length - 1)
+        {
+            currentLine++;
+            StartCoroutine(TypeLine());
+        }
+        else
+        {
+            EndDialogue();
+        }
+    }
+
+    void EndDialogue()
+    {
+        if (dialoguePanel != null)
+            dialoguePanel.SetActive(false);
+        dialogueText.text = "";
+    }
+} 

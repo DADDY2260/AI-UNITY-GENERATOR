@@ -1,13 +1,15 @@
 """
-LLM-powered game idea enhancer
-Uses OpenAI API to suggest improvements to game ideas
+LLM-powered game idea enhancer with RAG integration
+Uses OpenAI API with RAG pipeline to suggest improvements to game ideas
 """
 
 import os
 import json
 from typing import List, Dict, Any
-from openai import OpenAI
+from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
+import torch
 from pydantic import BaseModel
+from ..rag.rag_pipeline import RAGPipeline
 
 class GameEnhancement(BaseModel):
     category: str
@@ -16,76 +18,70 @@ class GameEnhancement(BaseModel):
 
 class GameEnhancer:
     def __init__(self):
-        """Initialize the game enhancer with OpenAI client"""
-        api_key = os.getenv("OPENAI_API_KEY")
-        if not api_key:
-            raise ValueError("OPENAI_API_KEY environment variable is required")
-        
-        self.client = OpenAI(api_key=api_key)
-        
+        """Initialize the game enhancer with Hugging Face Mistral-7B and RAG pipeline"""
+        # Load Mistral-7B model and tokenizer
+        model_name = "mistralai/Mistral-7B-Instruct-v0.2"
+        self.tokenizer = AutoTokenizer.from_pretrained(model_name, use_auth_token=True)
+        self.model = AutoModelForCausalLM.from_pretrained(model_name, torch_dtype=torch.float16, device_map="auto", use_auth_token=True)
+        self.generator = pipeline("text-generation", model=self.model, tokenizer=self.tokenizer, device=0 if torch.cuda.is_available() else -1)
+
+        # Initialize RAG pipeline
+        self.rag_pipeline = RAGPipeline()
         # Define enhancement categories
         self.categories = {
             "mechanics": "Gameplay mechanics and player abilities",
-            "levels": "Level design and environment ideas", 
-            "story": "Narrative elements and character development"
+            "levels": "Level design and environment ideas",
+            "story": "Narrative elements and character development",
+            "audio": "Audio and music suggestions",
+            "visual": "Visual effects and art style suggestions",
+            "uiux": "UI/UX improvements and interface ideas",
+            "cutscenes": "Cutscene and dialogue ideas"
         }
     
     async def enhance_idea(self, game_idea: str, genre: str = "general") -> List[GameEnhancement]:
         """
         Take a game idea and suggest enhancements across different categories
-        
-        Args:
-            game_idea: The original game description
-            genre: Game genre (platformer, rpg, puzzle, etc.)
-            
-        Returns:
-            List of GameEnhancement objects with suggestions
         """
-        
         # Create the enhancement prompt
-        prompt = self._create_enhancement_prompt(game_idea, genre)
-        
+        original_prompt = self._create_enhancement_prompt(game_idea, genre)
+        # Enhance prompt with RAG
+        enhanced_prompt = self.rag_pipeline.enhance_prompt_with_rag(
+            original_prompt, game_idea, genre
+        )
         try:
-            # Call OpenAI API
-            response = self.client.chat.completions.create(
-                model="gpt-3.5-turbo",
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "You are an expert game designer who helps enhance game ideas with creative suggestions."
-                    },
-                    {
-                        "role": "user", 
-                        "content": prompt
-                    }
-                ],
-                temperature=0.8,  # Creative but focused
-                max_tokens=1000
+            # Use Hugging Face pipeline for text generation
+            prompt = (
+                "You are an expert game designer who helps enhance game ideas with creative suggestions. "
+                "Use the provided knowledge base information to give more specific, actionable, and Unity-appropriate suggestions.\n" + enhanced_prompt
             )
-            
-            # Parse the response
-            content = response.choices[0].message.content
+            response = self.generator(prompt, max_new_tokens=1000, temperature=0.8, do_sample=True)
+            content = response[0]["generated_text"]
             enhancements = self._parse_enhancements(content)
-            
             return enhancements
-            
         except Exception as e:
-            # Fallback to basic suggestions if API fails
-            print(f"API call failed: {e}")
+            print(f"LLM call failed: {e}")
             return self._generate_fallback_enhancements(game_idea, genre)
     
     def _create_enhancement_prompt(self, game_idea: str, genre: str) -> str:
         """Create a detailed prompt for the LLM"""
         
+        is_3d = any(g in genre.lower() for g in ["3d", "3d platformer", "3d adventure", "3d shooter", "3d puzzle"])
+        dimension_note = "This is a 3D game. Please make all suggestions and mechanics appropriate for 3D gameplay (e.g., 3D movement, camera, physics, etc.)." if is_3d else ""
+        
         return f"""
-        I have a game idea: "{game_idea}"
+        I have a game idea: \"{game_idea}\"
         Genre: {genre}
+        {dimension_note}
         
         Please suggest enhancements in these categories:
         
         1. MECHANICS: Suggest 3-5 gameplay mechanics, abilities, or systems that would make this game more engaging
         2. LEVELS: Suggest 3-5 level design ideas, environments, or progression elements
         3. STORY: Suggest 3-5 narrative elements, character motivations, or world-building ideas
+        4. AUDIO: Suggest 2-3 audio or music ideas that fit the game
+        5. VISUAL: Suggest 2-3 visual effects, art styles, or animations
+        6. UIUX: Suggest 2-3 UI/UX improvements or interface ideas
+        7. CUTSCENES: Suggest 2-3 cutscene or dialogue moments
         
         Format your response as JSON:
         {{
@@ -100,6 +96,22 @@ class GameEnhancer:
             "story": {{
                 "suggestions": ["story1", "story2", "story3"],
                 "description": "Brief explanation of story category"
+            }},
+            "audio": {{
+                "suggestions": ["audio1", "audio2"],
+                "description": "Brief explanation of audio category"
+            }},
+            "visual": {{
+                "suggestions": ["visual1", "visual2"],
+                "description": "Brief explanation of visual category"
+            }},
+            "uiux": {{
+                "suggestions": ["uiux1", "uiux2"],
+                "description": "Brief explanation of UI/UX category"
+            }},
+            "cutscenes": {{
+                "suggestions": ["cutscene1", "cutscene2"],
+                "description": "Brief explanation of cutscenes category"
             }}
         }}
         

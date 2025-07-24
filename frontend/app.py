@@ -76,7 +76,7 @@ def main():
         st.header("📋 Supported Genres")
         genres = [
             "Platformer", "RPG", "Puzzle", "Shooter", 
-            "Adventure", "Strategy", "Racing", "General"
+            "Adventure", "Strategy", "Racing", "Metroidvania", "Roguelike", "Survival", "Puzzle-Platformer", "3D Platformer", "3D Adventure", "3D Shooter", "3D Puzzle", "General"
         ]
         st.write(", ".join(genres))
         
@@ -87,10 +87,11 @@ def main():
         ✅ **Project structure creation**
         ✅ **Ready-to-import prototypes**
         ✅ **Multiple game genres**
+        ✅ **New: Audio, Visual Effects, UI/UX, Cutscenes enhancements**
         """)
     
     # Main content
-    tab1, tab2, tab3 = st.tabs(["🎯 Game Idea", "✨ Enhancements", "📦 Generate Project"])
+    tab1, tab2, tab3, tab4 = st.tabs(["🎯 Game Idea", "✨ Enhancements", "📦 Generate Project", "💬 Chat"])
     
     with tab1:
         st.header("Describe Your Game Idea")
@@ -108,9 +109,10 @@ def main():
         with col1:
             genre = st.selectbox(
                 "Game Genre (Optional)",
-                ["general", "platformer", "rpg", "puzzle", "shooter", "adventure", "strategy", "racing"],
+                ["general", "platformer", "rpg", "puzzle", "shooter", "adventure", "strategy", "racing", "metroidvania", "roguelike", "survival", "puzzle-platformer", "3d platformer", "3d adventure", "3d shooter", "3d puzzle"],
                 help="This helps the AI provide more relevant suggestions"
             )
+            st.session_state["selected_genre"] = genre
         
         with col2:
             st.write("")
@@ -137,6 +139,31 @@ def main():
             display_project_generation()
         else:
             st.info("👆 Complete the enhancement step first to generate your project!")
+
+    with tab4:
+        st.header("💬 Chat with Unity AI Assistant")
+        if "chat_history" not in st.session_state:
+            st.session_state["chat_history"] = []
+        for entry in st.session_state["chat_history"]:
+            if entry["role"] == "user":
+                st.markdown(f"<div style='text-align:right'><b>You:</b> {entry['content']}</div>", unsafe_allow_html=True)
+            else:
+                st.markdown(f"<div style='text-align:left'><b>Assistant:</b> {entry['content']}</div>", unsafe_allow_html=True)
+        user_input = st.text_input("Type your message...", key="chat_input")
+        if st.button("Send", key="send_chat"):
+            if user_input.strip():
+                st.session_state["chat_history"].append({"role": "user", "content": user_input})
+                with st.spinner("Assistant is typing..."):
+                    try:
+                        resp = requests.post(f"{BACKEND_URL}/chat", json={"message": user_input}, timeout=60)
+                        if resp.status_code == 200:
+                            data = resp.json()
+                            st.session_state["chat_history"].append({"role": "assistant", "content": data["response"]})
+                        else:
+                            st.session_state["chat_history"].append({"role": "assistant", "content": f"Error: {resp.text}"})
+                    except Exception as e:
+                        st.session_state["chat_history"].append({"role": "assistant", "content": f"Error: {str(e)}"})
+                st.experimental_rerun()
 
 def enhance_game_idea(game_idea: str, genre: str):
     """Call the backend to enhance the game idea"""
@@ -201,8 +228,85 @@ def display_project_generation():
     
     st.divider()
     
+    # Asset Generation Modal Logic
+    if "show_asset_modal" not in st.session_state:
+        st.session_state["show_asset_modal"] = False
+    
+    if st.button("🖼️ Generate Assets (Optional)", use_container_width=True):
+        st.session_state["show_asset_modal"] = True
+        st.experimental_rerun()
+    
+    if st.session_state["show_asset_modal"]:
+        with st.expander("AI Asset Generation", expanded=True):
+            st.markdown("**Select which assets to generate and which AI model(s) to use:**")
+            with st.form("asset_generation_form"):
+                asset_types = st.multiselect(
+                    "Asset Types",
+                    ["Main Character", "Enemy", "Background", "Icon"],
+                    default=["Main Character", "Enemy"]
+                )
+                model_choices = st.multiselect(
+                    "AI Model(s)",
+                    ["DALL·E", "Stable Diffusion"],
+                    default=["DALL·E"]
+                )
+                asset_descriptions = {}
+                for asset_type in asset_types:
+                    asset_descriptions[asset_type] = st.text_input(
+                        f"Description for {asset_type}",
+                        value="" if asset_type not in st.session_state.get("last_asset_descriptions", {}) else st.session_state["last_asset_descriptions"][asset_type],
+                        key=f"desc_{asset_type}"
+                    )
+                generate = st.form_submit_button("Generate Assets", type="primary")
+                cancel = st.form_submit_button("Cancel")
+                if generate:
+                    st.session_state["selected_asset_types"] = asset_types
+                    st.session_state["selected_asset_models"] = model_choices
+                    st.session_state["last_asset_descriptions"] = asset_descriptions
+                    st.session_state["show_asset_modal"] = False
+                    # Call backend to generate assets
+                    with st.spinner("Generating assets with AI..."):
+                        try:
+                            response = requests.post(
+                                f"{BACKEND_URL}/generate-assets",
+                                json={
+                                    "asset_types": asset_types,
+                                    "asset_descriptions": asset_descriptions,
+                                    "models": model_choices,
+                                    "game_description": st.session_state.get("original_idea", ""),
+                                    "genre": st.session_state.get("selected_genre", st.session_state.get("genre", "general")),
+                                    "project_folder_name": st.session_state.get("project_folder_name", "")
+                                },
+                                timeout=60
+                            )
+                            if response.status_code == 200:
+                                data = response.json()
+                                st.success(f"{data.get('message','Assets generated!')}")
+                                if data.get('generated_files'):
+                                    st.markdown("**Generated Files:**")
+                                    for f in data['generated_files']:
+                                        st.write(f)
+                                        if f.endswith('.png'):
+                                            try:
+                                                st.image(f, caption=f, use_column_width=True)
+                                            except Exception:
+                                                pass
+                            else:
+                                st.error(f"❌ Error: {response.text}")
+                        except requests.exceptions.RequestException as e:
+                            st.error(f"❌ Connection error: {str(e)}")
+                if cancel:
+                    st.session_state["show_asset_modal"] = False
+                    st.experimental_rerun()
+    
     if st.button("🎮 Generate Unity Project", type="primary", use_container_width=True):
         generate_unity_project()
+    
+    # Show download link if available
+    if "last_project_url" in st.session_state and "last_project_filename" in st.session_state:
+        st.success("✅ Unity project generated! Click below to download your .zip file.")
+        download_url = f"{BACKEND_URL}/download/{st.session_state['last_project_filename']}"
+        st.markdown(f"[📦 Download Unity Project]({download_url})", unsafe_allow_html=True)
 
 def generate_unity_project():
     """Call the backend to generate the Unity project"""
@@ -213,7 +317,8 @@ def generate_unity_project():
                 f"{BACKEND_URL}/generate-project",
                 json={
                     "original_idea": st.session_state.original_idea,
-                    "selected_enhancements": st.session_state.selected_enhancements
+                    "selected_enhancements": st.session_state.selected_enhancements,
+                    "genre": st.session_state.get("selected_genre", st.session_state.get("genre", "general"))
                 },
                 timeout=60
             )
@@ -237,23 +342,15 @@ def generate_unity_project():
                 for script in data["main_scripts"]:
                     st.code(f"Assets/Scripts/{script}.cs", language="text")
                 
-                # Download button (in a real app, this would download the actual file)
-                st.markdown("---")
-                st.markdown("### 📥 Download Your Project")
-                st.info("""
-                **Note:** In this demo, the project is generated but not actually downloadable.
-                In a full implementation, you would get a real Unity project zip file!
-                
-                To test this locally:
-                1. Check the backend console for the generated project path
-                2. Look for a zip file in the backend directory
-                3. Extract and open in Unity
-                """)
-                
-                # Simulate download button
-                if st.button("📦 Download Unity Project (Demo)", use_container_width=True):
-                    st.balloons()
-                    st.success("🎉 Project ready! (This is a demo - check the backend for the actual file)")
+                # Save project folder name for asset generation
+                if "project_url" in data and data["project_url"].startswith("/downloads/"):
+                    filename = data["project_url"].split("/")[-1]
+                    st.session_state["last_project_url"] = data["project_url"]
+                    st.session_state["last_project_filename"] = filename
+                    # Extract project folder name from filename (strip .zip)
+                    if filename.endswith(".zip"):
+                        folder_name = filename[:-4]
+                        st.session_state["project_folder_name"] = folder_name
                 
             else:
                 st.error(f"❌ Error generating project: {response.text}")

@@ -28,9 +28,9 @@ class UnityGenerator:
             "UIManager": "UIManager.cs.j2"
         }
     
-    async def generate_project(self, game_idea: str, selected_enhancements: Dict[str, List[str]]) -> Dict[str, Any]:
+    async def generate_project(self, game_idea: str, selected_enhancements: Dict[str, List[str]], genre: str = "general") -> Dict[str, Any]:
         """
-        Generate a complete Unity project based on game idea and enhancements
+        Generate a complete Unity project based on game idea, enhancements, and genre
         
         Args:
             game_idea: Original game description
@@ -40,30 +40,35 @@ class UnityGenerator:
             Dictionary with project info including download URL
         """
         
-        # Create temporary directory for project
-        with tempfile.TemporaryDirectory() as temp_dir:
-            project_path = Path(temp_dir) / "unity_project"
-            project_path.mkdir()
-            
-            # Generate project structure
-            self._create_project_structure(project_path)
-            
-            # Generate C# scripts
-            scripts = self._generate_scripts(game_idea, selected_enhancements, project_path)
-            
-            # Generate project files
-            self._generate_project_files(project_path, game_idea)
-            
-            # Create zip file
-            zip_path = self._create_project_zip(project_path, game_idea)
-            
-            # For now, return basic info (in real app, upload to cloud storage)
-            return {
-                "download_url": f"/downloads/{os.path.basename(zip_path)}",
-                "file_count": len(list(project_path.rglob("*"))),
-                "main_scripts": [script["name"] for script in scripts],
-                "project_path": str(zip_path)
-            }
+        # Use a persistent output directory
+        output_dir = Path("generated_projects")
+        output_dir.mkdir(exist_ok=True)
+        project_id = uuid.uuid4().hex[:8]
+        safe_name = "".join(c for c in game_idea if c.isalnum() or c in (' ', '-', '_')).rstrip()
+        safe_name = safe_name.replace(' ', '_')[:50]
+        project_folder = f"unity_project_{safe_name}_{project_id}"
+        project_path = output_dir / project_folder
+        project_path.mkdir(parents=True, exist_ok=True)
+        
+        # Generate project structure
+        self._create_project_structure(project_path)
+        
+        # Generate C# scripts
+        scripts = self._generate_scripts(game_idea, selected_enhancements, project_path, genre)
+        
+        # Generate project files
+        self._generate_project_files(project_path, game_idea)
+        
+        # Create zip file in output_dir
+        zip_path = self._create_project_zip(project_path, game_idea, output_dir)
+        
+        # For now, return basic info (in real app, upload to cloud storage)
+        return {
+            "download_url": f"/downloads/{os.path.basename(zip_path)}",
+            "file_count": len(list(project_path.rglob("*"))),
+            "main_scripts": [script["name"] for script in scripts],
+            "project_path": str(zip_path)
+        }
     
     def _create_project_structure(self, project_path: Path):
         """Create basic Unity project folder structure"""
@@ -87,15 +92,19 @@ class UnityGenerator:
         for folder in folders:
             (project_path / folder).mkdir(parents=True, exist_ok=True)
     
-    def _generate_scripts(self, game_idea: str, selected_enhancements: Dict[str, List[str]], project_path: Path) -> List[Dict]:
-        """Generate C# scripts based on game idea and enhancements"""
+    def _generate_scripts(self, game_idea: str, selected_enhancements: Dict[str, List[str]], project_path: Path, genre: str = "general") -> List[Dict]:
+        """Generate C# scripts based on game idea, enhancements, and genre"""
         
         scripts = []
         scripts_dir = project_path / "Assets" / "Scripts"
         
+        # Determine which player controller to use based on genre
+        is_3d = "3d" in genre.lower()
+        player_controller_script = "PlayerController3D" if is_3d else "PlayerController"
+        
         # Always generate core scripts
         core_scripts = [
-            ("PlayerController", "Player"),
+            (player_controller_script, "Player"),
             ("GameManager", "Managers"),
             ("UIManager", "UI")
         ]
@@ -118,7 +127,10 @@ class UnityGenerator:
             })
         
         # Generate optional scripts based on enhancements
-        if "Collectible items" in selected_enhancements.get("mechanics", []):
+        if (
+            "Collectible items" in selected_enhancements.get("mechanics", [])
+            or "Collectibles" in selected_enhancements.get("mechanics", [])
+        ):
             collectible_script = self._generate_script_content("Collectible", game_idea, selected_enhancements)
             collectible_path = scripts_dir / "Collectibles" / "Collectible.cs"
             with open(collectible_path, 'w') as f:
@@ -128,27 +140,53 @@ class UnityGenerator:
                 "path": str(collectible_path.relative_to(project_path)),
                 "content": collectible_script
             })
-        
-        if any("enemy" in enhancement.lower() for enhancement in selected_enhancements.get("mechanics", [])):
-            enemy_script = self._generate_script_content("EnemyAI", game_idea, selected_enhancements)
-            enemy_path = scripts_dir / "Enemies" / "EnemyAI.cs"
-            with open(enemy_path, 'w') as f:
-                f.write(enemy_script)
+
+        # PowerUp script
+        if any(
+            kw in (s.lower() if isinstance(s, str) else "")
+            for kw in ["power-up", "powerups", "power up", "powerups", "power up"]
+            for s in selected_enhancements.get("mechanics", [])
+        ):
+            powerup_script = self._generate_script_content("PowerUp", game_idea, selected_enhancements)
+            powerup_path = scripts_dir / "Collectibles" / "PowerUp.cs"
+            with open(powerup_path, 'w') as f:
+                f.write(powerup_script)
             scripts.append({
-                "name": "EnemyAI", 
-                "path": str(enemy_path.relative_to(project_path)),
-                "content": enemy_script
+                "name": "PowerUp",
+                "path": str(powerup_path.relative_to(project_path)),
+                "content": powerup_script
             })
-        
-        if "Multiple levels" in selected_enhancements.get("levels", []):
-            level_script = self._generate_script_content("LevelManager", game_idea, selected_enhancements)
-            level_path = scripts_dir / "Managers" / "LevelManager.cs"
-            with open(level_path, 'w') as f:
-                f.write(level_script)
+
+        # BossEnemy script
+        if any(
+            kw in (s.lower() if isinstance(s, str) else "")
+            for kw in ["boss", "boss fight", "boss enemy"]
+            for s in selected_enhancements.get("levels", []) + selected_enhancements.get("mechanics", [])
+        ):
+            boss_script = self._generate_script_content("BossEnemy", game_idea, selected_enhancements)
+            boss_path = scripts_dir / "Enemies" / "BossEnemy.cs"
+            with open(boss_path, 'w') as f:
+                f.write(boss_script)
             scripts.append({
-                "name": "LevelManager",
-                "path": str(level_path.relative_to(project_path)), 
-                "content": level_script
+                "name": "BossEnemy",
+                "path": str(boss_path.relative_to(project_path)),
+                "content": boss_script
+            })
+
+        # DialogueManager script
+        if any(
+            kw in (s.lower() if isinstance(s, str) else "")
+            for kw in ["dialogue", "cutscene", "story dialogue"]
+            for s in selected_enhancements.get("story", []) + selected_enhancements.get("mechanics", [])
+        ):
+            dialogue_script = self._generate_script_content("DialogueManager", game_idea, selected_enhancements)
+            dialogue_path = scripts_dir / "Managers" / "DialogueManager.cs"
+            with open(dialogue_path, 'w') as f:
+                f.write(dialogue_script)
+            scripts.append({
+                "name": "DialogueManager",
+                "path": str(dialogue_path.relative_to(project_path)),
+                "content": dialogue_script
             })
         
         return scripts
@@ -256,20 +294,15 @@ RenderSettings:
         with open(project_path / "Assets" / "Scenes" / "Main.unity", 'w') as f:
             f.write(scene_content)
     
-    def _create_project_zip(self, project_path: Path, game_idea: str) -> str:
-        """Create a zip file of the Unity project"""
-        
-        # Create a safe filename from game idea
+    def _create_project_zip(self, project_path: Path, game_idea: str, output_dir: Path) -> str:
+        """Create a zip file of the Unity project in the output directory"""
         safe_name = "".join(c for c in game_idea if c.isalnum() or c in (' ', '-', '_')).rstrip()
-        safe_name = safe_name.replace(' ', '_')[:50]  # Limit length
-        
+        safe_name = safe_name.replace(' ', '_')[:50]
         zip_filename = f"unity_project_{safe_name}_{uuid.uuid4().hex[:8]}.zip"
-        zip_path = project_path.parent / zip_filename
-        
+        zip_path = output_dir / zip_filename
         with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
             for file_path in project_path.rglob('*'):
                 if file_path.is_file():
                     arcname = file_path.relative_to(project_path)
                     zipf.write(file_path, arcname)
-        
         return str(zip_path) 

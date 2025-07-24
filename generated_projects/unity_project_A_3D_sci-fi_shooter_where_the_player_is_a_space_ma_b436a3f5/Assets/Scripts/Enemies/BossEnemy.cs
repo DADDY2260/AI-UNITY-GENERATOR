@@ -1,0 +1,84 @@
+using UnityEngine;
+
+/// <summary>
+/// BossEnemy - Handles boss AI and special attacks
+/// Generated for: A 3D sci-fi shooter where the player is a space marine fighting alien robots on a distant planet. Includes power-ups, boss battles, and a variety of weapons
+/// </summary>
+public class BossEnemy : MonoBehaviour
+{
+    public int maxHealth = 200;
+    public int currentHealth;
+    public float attackCooldown = 2f;
+    public GameObject[] specialAttacks;
+    public Transform[] attackPoints;
+    public AudioClip roarSound;
+    public GameObject deathEffect;
+
+    private float lastAttackTime;
+    private int phase = 1;
+    private bool isDead = false;
+
+    void Start()
+    {
+        currentHealth = maxHealth;
+        lastAttackTime = Time.time;
+        if (roarSound != null)
+            AudioSource.PlayClipAtPoint(roarSound, transform.position);
+    }
+
+    void Update()
+    {
+        if (isDead) return;
+        if (Time.time - lastAttackTime > attackCooldown)
+        {
+            PerformAttack();
+            lastAttackTime = Time.time;
+        }
+        UpdatePhase();
+    }
+
+    void PerformAttack()
+    {
+        if (specialAttacks.Length > 0 && attackPoints.Length > 0)
+        {
+            int attackIndex = Random.Range(0, specialAttacks.Length);
+            int pointIndex = Random.Range(0, attackPoints.Length);
+            Instantiate(specialAttacks[attackIndex], attackPoints[pointIndex].position, Quaternion.identity);
+        }
+    }
+
+    void UpdatePhase()
+    {
+        if (currentHealth < maxHealth * 0.5f && phase == 1)
+        {
+            phase = 2;
+            attackCooldown *= 0.7f;
+            // Add more aggressive behavior
+        }
+        if (currentHealth < maxHealth * 0.2f && phase == 2)
+        {
+            phase = 3;
+            attackCooldown *= 0.5f;
+            // Add final phase behavior
+        }
+    }
+
+    public void TakeDamage(int amount)
+    {
+        if (isDead) return;
+        currentHealth -= amount;
+        if (currentHealth <= 0)
+        {
+            Die();
+        }
+    }
+
+    void Die()
+    {
+        isDead = true;
+        if (deathEffect != null)
+            Instantiate(deathEffect, transform.position, Quaternion.identity);
+        // Trigger win condition, drop loot, etc.
+        Destroy(gameObject, 2f);
+    }
+} 
