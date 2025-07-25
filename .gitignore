@@ -49,3 +49,7 @@ Thumbs.db
 
 # Project output
 *.zip
+
+generated_projects/
+knowledge_base/
+dev_scripts/

@@ -31,38 +31,31 @@ class UnityGenerator:
     async def generate_project(self, game_idea: str, selected_enhancements: Dict[str, List[str]], genre: str = "general") -> Dict[str, Any]:
         """
         Generate a complete Unity project based on game idea, enhancements, and genre
-        
-        Args:
-            game_idea: Original game description
-            selected_enhancements: Dictionary of category -> selected suggestions
-            
-        Returns:
-            Dictionary with project info including download URL
         """
-        
-        # Use a persistent output directory
+        # Use a persistent output directory for generated projects
         output_dir = Path("generated_projects")
         output_dir.mkdir(exist_ok=True)
         project_id = uuid.uuid4().hex[:8]
+        # Sanitize and shorten the project folder name
         safe_name = "".join(c for c in game_idea if c.isalnum() or c in (' ', '-', '_')).rstrip()
         safe_name = safe_name.replace(' ', '_')[:50]
         project_folder = f"unity_project_{safe_name}_{project_id}"
         project_path = output_dir / project_folder
         project_path.mkdir(parents=True, exist_ok=True)
-        
-        # Generate project structure
+
+        # Generate Unity project folder structure (Assets, Scripts, etc.)
         self._create_project_structure(project_path)
-        
-        # Generate C# scripts
+
+        # Generate C# scripts based on the idea and enhancements
         scripts = self._generate_scripts(game_idea, selected_enhancements, project_path, genre)
-        
-        # Generate project files
+
+        # Generate project files (README, Main.unity scene)
         self._generate_project_files(project_path, game_idea)
-        
-        # Create zip file in output_dir
+
+        # Create a zip file of the generated project for download
         zip_path = self._create_project_zip(project_path, game_idea, output_dir)
-        
-        # For now, return basic info (in real app, upload to cloud storage)
+
+        # Return info for the frontend (download URL, script list, etc.)
         return {
             "download_url": f"/downloads/{os.path.basename(zip_path)}",
             "file_count": len(list(project_path.rglob("*"))),
@@ -94,39 +87,36 @@ class UnityGenerator:
     
     def _generate_scripts(self, game_idea: str, selected_enhancements: Dict[str, List[str]], project_path: Path, genre: str = "general") -> List[Dict]:
         """Generate C# scripts based on game idea, enhancements, and genre"""
-        
         scripts = []
         scripts_dir = project_path / "Assets" / "Scripts"
-        
-        # Determine which player controller to use based on genre
+
+        # Determine which player controller script to use (2D or 3D)
         is_3d = "3d" in genre.lower()
         player_controller_script = "PlayerController3D" if is_3d else "PlayerController"
-        
-        # Always generate core scripts
+
+        # Always generate core scripts for player, game management, and UI
         core_scripts = [
             (player_controller_script, "Player"),
             ("GameManager", "Managers"),
             ("UIManager", "UI")
         ]
-        
+
         for script_name, folder in core_scripts:
             script_content = self._generate_script_content(
                 script_name, game_idea, selected_enhancements
             )
-            
             script_path = scripts_dir / folder / f"{script_name}.cs"
             script_path.parent.mkdir(exist_ok=True)
-            
             with open(script_path, 'w') as f:
                 f.write(script_content)
-            
             scripts.append({
                 "name": script_name,
                 "path": str(script_path.relative_to(project_path)),
                 "content": script_content
             })
-        
-        # Generate optional scripts based on enhancements
+
+        # Optionally generate scripts based on selected enhancements
+        # Collectible script if collectibles are in mechanics
         if (
             "Collectible items" in selected_enhancements.get("mechanics", [])
             or "Collectibles" in selected_enhancements.get("mechanics", [])
@@ -141,7 +131,7 @@ class UnityGenerator:
                 "content": collectible_script
             })
 
-        # PowerUp script
+        # PowerUp script if power-up keywords are present
         if any(
             kw in (s.lower() if isinstance(s, str) else "")
             for kw in ["power-up", "powerups", "power up", "powerups", "power up"]
@@ -157,7 +147,7 @@ class UnityGenerator:
                 "content": powerup_script
             })
 
-        # BossEnemy script
+        # BossEnemy script if boss-related keywords are present
         if any(
             kw in (s.lower() if isinstance(s, str) else "")
             for kw in ["boss", "boss fight", "boss enemy"]
@@ -173,7 +163,7 @@ class UnityGenerator:
                 "content": boss_script
             })
 
-        # DialogueManager script
+        # DialogueManager script if dialogue/cutscene/story keywords are present
         if any(
             kw in (s.lower() if isinstance(s, str) else "")
             for kw in ["dialogue", "cutscene", "story dialogue"]
@@ -188,22 +178,19 @@ class UnityGenerator:
                 "path": str(dialogue_path.relative_to(project_path)),
                 "content": dialogue_script
             })
-        
+
         return scripts
     
     def _generate_script_content(self, script_name: str, game_idea: str, selected_enhancements: Dict[str, List[str]]) -> str:
         """Generate C# script content using Jinja2 templates"""
-        
-        # Get template
+        # Get the template name for the script, or fall back to a default
         template_name = self.script_templates.get(script_name, f"{script_name}.cs.j2")
-        
         try:
             template = self.env.get_template(template_name)
         except:
-            # Fallback to basic template
+            # Fallback to basic template if specific one is missing
             template = self.env.get_template("BasicScript.cs.j2")
-        
-        # Prepare template variables
+        # Prepare variables for the template rendering
         template_vars = {
             "game_idea": game_idea,
             "enhancements": selected_enhancements,
@@ -213,7 +200,7 @@ class UnityGenerator:
             "has_enemies": any("enemy" in e.lower() for e in selected_enhancements.get("mechanics", [])),
             "has_multiple_levels": "Multiple levels" in selected_enhancements.get("levels", [])
         }
-        
+        # Render the script using the template and variables
         return template.render(**template_vars)
     
     def _generate_project_files(self, project_path: Path, game_idea: str):

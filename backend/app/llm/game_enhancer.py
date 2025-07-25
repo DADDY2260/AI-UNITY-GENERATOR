@@ -18,16 +18,25 @@ class GameEnhancement(BaseModel):
 
 class GameEnhancer:
     def __init__(self):
-        """Initialize the game enhancer with Hugging Face Mistral-7B and RAG pipeline"""
-        # Load Mistral-7B model and tokenizer
-        model_name = "mistralai/Mistral-7B-Instruct-v0.2"
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name, use_auth_token=True)
-        self.model = AutoModelForCausalLM.from_pretrained(model_name, torch_dtype=torch.float16, device_map="auto", use_auth_token=True)
-        self.generator = pipeline("text-generation", model=self.model, tokenizer=self.tokenizer, device=0 if torch.cuda.is_available() else -1)
+        """Initialize the game enhancer with a smaller open model for testing"""
+        # Use a smaller, open model that doesn't require authentication
+        model_name = "distilgpt2"  # Much smaller, open model
+        
+        # Load model and tokenizer (no authentication needed)
+        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+        
+        # Load model with basic optimization
+        self.model = AutoModelForCausalLM.from_pretrained(
+            model_name, 
+            torch_dtype=torch.float16, 
+            device_map="auto"
+        )
+        # Pipeline for text generation (no device parameter needed with accelerate)
+        self.generator = pipeline("text-generation", model=self.model, tokenizer=self.tokenizer)
 
-        # Initialize RAG pipeline
+        # Initialize RAG pipeline for knowledge-augmented generation
         self.rag_pipeline = RAGPipeline()
-        # Define enhancement categories
+        # Define enhancement categories for structured suggestions
         self.categories = {
             "mechanics": "Gameplay mechanics and player abilities",
             "levels": "Level design and environment ideas",
@@ -44,18 +53,20 @@ class GameEnhancer:
         """
         # Create the enhancement prompt
         original_prompt = self._create_enhancement_prompt(game_idea, genre)
-        # Enhance prompt with RAG
+        # Enhance prompt with RAG (retrieves relevant knowledge base info)
         enhanced_prompt = self.rag_pipeline.enhance_prompt_with_rag(
             original_prompt, game_idea, genre
         )
         try:
-            # Use Hugging Face pipeline for text generation
+            # Compose the final prompt for the LLM, including RAG context
             prompt = (
                 "You are an expert game designer who helps enhance game ideas with creative suggestions. "
                 "Use the provided knowledge base information to give more specific, actionable, and Unity-appropriate suggestions.\n" + enhanced_prompt
             )
+            # Generate suggestions using the LLM
             response = self.generator(prompt, max_new_tokens=1000, temperature=0.8, do_sample=True)
             content = response[0]["generated_text"]
+            # Parse the LLM output into structured enhancements
             enhancements = self._parse_enhancements(content)
             return enhancements
         except Exception as e:
@@ -124,7 +135,6 @@ class GameEnhancer:
     
     def _parse_enhancements(self, content: str) -> List[GameEnhancement]:
         """Parse the LLM response into structured enhancements"""
-        
         try:
             # Try to extract JSON from the response
             # Sometimes the LLM wraps JSON in markdown or adds extra text
@@ -138,9 +148,8 @@ class GameEnhancer:
                 json_str = content[json_start:json_end]
             else:
                 raise ValueError("No JSON found in response")
-            
+            # Attempt to parse the extracted JSON string
             data = json.loads(json_str)
-            
             enhancements = []
             for category, details in data.items():
                 if category in self.categories:
@@ -150,12 +159,10 @@ class GameEnhancer:
                         description=details.get("description", self.categories[category])
                     )
                     enhancements.append(enhancement)
-            
             return enhancements
-            
         except (json.JSONDecodeError, KeyError, ValueError) as e:
             print(f"Failed to parse LLM response: {e}")
-            # Return fallback suggestions
+            # Return fallback suggestions if parsing fails
             return self._generate_fallback_enhancements("", "general")
     
     def _generate_fallback_enhancements(self, game_idea: str, genre: str) -> List[GameEnhancement]:

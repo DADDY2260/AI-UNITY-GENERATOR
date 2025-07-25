@@ -1,6 +1,10 @@
 """
 AI Unity Game Prototype Generator - Streamlit Frontend
-A simple web interface for generating Unity game prototypes
+A simple web interface for generating Unity game prototypes.
+
+This module defines the Streamlit frontend for the AI Unity Game Generator.
+It provides a user-friendly interface for describing game ideas, reviewing AI enhancements,
+generating Unity projects, chatting with an AI assistant, and managing assets.
 """
 
 import streamlit as st
@@ -10,9 +14,13 @@ import time
 from typing import Dict, List, Any
 
 # Configuration
-BACKEND_URL = "http://localhost:8000"
+BACKEND_URL = "http://127.0.0.1:8000"  # Use IP instead of localhost
 
 def main():
+    """
+    Main entry point for the Streamlit frontend UI.
+    Sets up the page, sidebar, and main tabs for game idea input, enhancements, project generation, and chat.
+    """
     st.set_page_config(
         page_title="AI Unity Game Generator",
         page_icon="🎮",
@@ -20,41 +28,146 @@ def main():
         initial_sidebar_state="expanded"
     )
     
+    # Add debugging after set_page_config
+    st.write(f"🔍 Checking backend at: {BACKEND_URL}")
+    
     # Custom CSS for better styling
     st.markdown("""
     <style>
+    /* Main header styling */
     .main-header {
-        font-size: 3rem;
+        font-size: 2.5rem;
         font-weight: bold;
         text-align: center;
         color: #1f77b4;
-        margin-bottom: 2rem;
+        margin-bottom: 1.5rem;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
     }
     .sub-header {
-        font-size: 1.5rem;
+        font-size: 1.3rem;
         color: #666;
         text-align: center;
         margin-bottom: 2rem;
+        font-style: italic;
     }
+    
+    /* Card styling for enhancements */
     .enhancement-card {
-        background-color: #f0f2f6;
-        padding: 1rem;
-        border-radius: 0.5rem;
-        margin: 0.5rem 0;
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        padding: 1.5rem;
+        border-radius: 0.8rem;
+        margin: 0.8rem 0;
+        border: 1px solid #dee2e6;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        transition: transform 0.2s ease;
     }
+    .enhancement-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+    
+    /* Success and error message styling */
     .success-message {
-        background-color: #d4edda;
+        background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
         color: #155724;
-        padding: 1rem;
-        border-radius: 0.5rem;
+        padding: 1.2rem;
+        border-radius: 0.8rem;
         border: 1px solid #c3e6cb;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
     .error-message {
-        background-color: #f8d7da;
+        background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
         color: #721c24;
-        padding: 1rem;
-        border-radius: 0.5rem;
+        padding: 1.2rem;
+        border-radius: 0.8rem;
         border: 1px solid #f5c6cb;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    /* Chat message styling */
+    .chat-user {
+        background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+        color: white;
+        padding: 0.8rem 1.2rem;
+        border-radius: 1rem 1rem 0.2rem 1rem;
+        margin: 0.5rem 0;
+        max-width: 80%;
+        margin-left: auto;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .chat-assistant {
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        color: #333;
+        padding: 0.8rem 1.2rem;
+        border-radius: 1rem 1rem 1rem 0.2rem;
+        margin: 0.5rem 0;
+        max-width: 80%;
+        border: 1px solid #dee2e6;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    /* Button styling */
+    .stButton > button {
+        border-radius: 0.5rem;
+        font-weight: 600;
+        transition: all 0.2s ease;
+    }
+    .stButton > button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    }
+    
+    /* Input field styling */
+    .stTextInput > div > div > input {
+        border-radius: 0.5rem;
+        border: 2px solid #dee2e6;
+        transition: border-color 0.2s ease;
+    }
+    .stTextInput > div > div > input:focus {
+        border-color: #007bff;
+        box-shadow: 0 0 0 0.2rem rgba(0,123,255,0.25);
+    }
+    
+    /* Responsive design */
+    @media (max-width: 768px) {
+        .main-header {
+            font-size: 2rem;
+        }
+        .sub-header {
+            font-size: 1.1rem;
+        }
+    }
+    
+    /* Loading spinner styling */
+    .loading-container {
+        text-align: center;
+        padding: 2rem;
+    }
+    
+    /* Tooltip styling */
+    .tooltip {
+        position: relative;
+        display: inline-block;
+    }
+    .tooltip .tooltiptext {
+        visibility: hidden;
+        width: 200px;
+        background-color: #555;
+        color: #fff;
+        text-align: center;
+        border-radius: 6px;
+        padding: 5px;
+        position: absolute;
+        z-index: 1;
+        bottom: 125%;
+        left: 50%;
+        margin-left: -100px;
+        opacity: 0;
+        transition: opacity 0.3s;
+    }
+    .tooltip:hover .tooltiptext {
+        visibility: visible;
+        opacity: 1;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -91,33 +204,49 @@ def main():
         """)
     
     # Main content
-    tab1, tab2, tab3, tab4 = st.tabs(["🎯 Game Idea", "✨ Enhancements", "📦 Generate Project", "💬 Chat"])
+    tab1, tab2, tab3, tab4 = st.tabs(["🎯 Game Idea", "✨ Elements", "📦 Generate Project", "💬 Chat"])
     
     with tab1:
         st.header("Describe Your Game Idea")
         
-        # Game idea input
+        # Game idea input with better UX
         game_idea = st.text_area(
             "What's your game idea?",
             placeholder="e.g., A 2D platformer where a fox collects magical gems to restore a forest...",
             height=150,
-            help="Be as detailed as you want! The AI will use this to suggest improvements."
+            help="Be as detailed as you want! The AI will use this to suggest improvements. Include genre, mechanics, story elements, or any specific features you want."
         )
         
-        # Genre selection
+        # Example prompts for inspiration
+        with st.expander("💡 Need inspiration? Try these examples:", expanded=False):
+            st.markdown("""
+            **Platformer Examples:**
+            - "A 2D platformer where a robot explores an abandoned space station"
+            - "A 3D platformer where a cat jumps between floating islands"
+            
+            **RPG Examples:**
+            - "A turn-based RPG where you manage a small village"
+            - "An action RPG where you play as a time-traveling knight"
+            
+            **Shooter Examples:**
+            - "A top-down shooter where you defend a base from waves of enemies"
+            - "A first-person shooter set in a cyberpunk city"
+            """)
+        
+        # Genre selection with better organization
         col1, col2 = st.columns(2)
         with col1:
             genre = st.selectbox(
                 "Game Genre (Optional)",
                 ["general", "platformer", "rpg", "puzzle", "shooter", "adventure", "strategy", "racing", "metroidvania", "roguelike", "survival", "puzzle-platformer", "3d platformer", "3d adventure", "3d shooter", "3d puzzle"],
-                help="This helps the AI provide more relevant suggestions"
+                help="This helps the AI provide more relevant suggestions. Choose 'general' if you're unsure!"
             )
             st.session_state["selected_genre"] = genre
         
         with col2:
             st.write("")
             st.write("")
-            if st.button("🚀 Enhance My Idea", type="primary", use_container_width=True):
+            if st.button("🚀 Enhance My Idea", type="primary", use_container_width=True, help="Send your idea to the AI for enhancement suggestions"):
                 if game_idea.strip():
                     enhance_game_idea(game_idea, genre)
                 else:
@@ -141,32 +270,72 @@ def main():
             st.info("👆 Complete the enhancement step first to generate your project!")
 
     with tab4:
-        st.header("💬 Chat with Unity AI Assistant")
-        if "chat_history" not in st.session_state:
-            st.session_state["chat_history"] = []
-        for entry in st.session_state["chat_history"]:
+        st.markdown("""
+        <div class="chat-header">
+            <h2>💬 Chat with AI Unity Assistant</h2>
+            <p>Ask me anything about Unity game development, C# scripting, or game design!</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Example prompts
+        with st.expander("💡 Example Questions", expanded=False):
+            st.markdown("""
+            **Try asking:**
+            - "How do I make a player controller in Unity?"
+            - "What's the best way to handle collision detection?"
+            - "How can I optimize my game's performance?"
+            - "What are some good practices for Unity project structure?"
+            - "How do I create a simple inventory system?"
+            - "What's the difference between Update() and FixedUpdate()?"
+            """)
+        
+        # Chat interface
+        if "chat_messages" not in st.session_state:
+            st.session_state.chat_messages = []
+        
+        # Display chat history with improved styling
+        for entry in st.session_state["chat_messages"]:
             if entry["role"] == "user":
-                st.markdown(f"<div style='text-align:right'><b>You:</b> {entry['content']}</div>", unsafe_allow_html=True)
+                st.markdown(f'<div class="chat-user"><b>You:</b> {entry["content"]}</div>', unsafe_allow_html=True)
             else:
-                st.markdown(f"<div style='text-align:left'><b>Assistant:</b> {entry['content']}</div>", unsafe_allow_html=True)
-        user_input = st.text_input("Type your message...", key="chat_input")
-        if st.button("Send", key="send_chat"):
-            if user_input.strip():
-                st.session_state["chat_history"].append({"role": "user", "content": user_input})
-                with st.spinner("Assistant is typing..."):
-                    try:
-                        resp = requests.post(f"{BACKEND_URL}/chat", json={"message": user_input}, timeout=60)
-                        if resp.status_code == 200:
-                            data = resp.json()
-                            st.session_state["chat_history"].append({"role": "assistant", "content": data["response"]})
-                        else:
-                            st.session_state["chat_history"].append({"role": "assistant", "content": f"Error: {resp.text}"})
-                    except Exception as e:
-                        st.session_state["chat_history"].append({"role": "assistant", "content": f"Error: {str(e)}"})
+                st.markdown(f'<div class="chat-assistant"><b>Assistant:</b> {entry["content"]}</div>', unsafe_allow_html=True)
+        
+        # Chat input with better UX
+        user_input = st.text_input(
+            "Type your message...", 
+            key="chat_input",
+            placeholder="Ask about Unity development, game mechanics, or code examples..."
+        )
+        
+        col1, col2 = st.columns([1, 4])
+        with col1:
+            if st.button("Send", key="send_chat", help="Send your message to the AI assistant"):
+                if user_input.strip():
+                    st.session_state["chat_messages"].append({"role": "user", "content": user_input})
+                    with st.spinner("🤖 Assistant is thinking..."):
+                        try:
+                            resp = requests.post(f"{BACKEND_URL}/chat", json={"message": user_input}, timeout=60)
+                            if resp.status_code == 200:
+                                data = resp.json()
+                                st.session_state["chat_messages"].append({"role": "assistant", "content": data["response"]})
+                            else:
+                                st.session_state["chat_messages"].append({"role": "assistant", "content": f"❌ Error: {resp.text}"})
+                        except Exception as e:
+                            st.session_state["chat_messages"].append({"role": "assistant", "content": f"❌ Connection error: {str(e)}"})
+                    st.experimental_rerun()
+                else:
+                    st.warning("Please enter a message first!")
+        
+        with col2:
+            if st.button("Clear Chat", key="clear_chat", help="Clear the chat history"):
+                st.session_state["chat_messages"] = []
                 st.experimental_rerun()
 
 def enhance_game_idea(game_idea: str, genre: str):
-    """Call the backend to enhance the game idea"""
+    """
+    Call the backend to enhance the user's game idea using LLM and RAG.
+    Updates session state with enhancements and original idea.
+    """
     
     with st.spinner("🤖 AI is analyzing your game idea..."):
         try:
@@ -191,35 +360,65 @@ def enhance_game_idea(game_idea: str, genre: str):
             st.info("💡 Make sure the backend server is running on localhost:8000")
 
 def display_enhancements():
-    """Display the AI enhancements with checkboxes"""
-    
+    """
+    Display the AI enhancements with checkboxes for user selection.
+    Updates session state with selected enhancements.
+    """
     st.markdown(f"**Original Idea:** {st.session_state.original_idea}")
     st.divider()
     
-    # Create a form for enhancements
+    # Create a form for enhancements with better visual organization
     with st.form("enhancements_form"):
         st.subheader("Select the enhancements you want to include:")
+        st.info("💡 Check the boxes for features you want in your Unity project. You can select multiple items from each category!")
         
         for enhancement in st.session_state.enhancements:
-            st.markdown(f"### {enhancement['category'].title()}")
-            st.markdown(f"*{enhancement['description']}*")
-            
-            # Create checkboxes for each suggestion
-            selected_suggestions = []
-            for suggestion in enhancement['suggestions']:
-                if st.checkbox(suggestion, key=f"{enhancement['category']}_{suggestion}"):
-                    selected_suggestions.append(suggestion)
-            
-            st.session_state.selected_enhancements[enhancement['category']] = selected_suggestions
-            
-            st.divider()
+            # Create a card-like container for each enhancement category
+            with st.container():
+                st.markdown(f"### 🎯 {enhancement['category'].title()}")
+                st.markdown(f"*{enhancement['description']}*")
+                
+                # Create checkboxes for each suggestion with better spacing
+                selected_suggestions = []
+                for i, suggestion in enumerate(enhancement['suggestions']):
+                    if st.checkbox(
+                        suggestion, 
+                        key=f"{enhancement['category']}_{suggestion}",
+                        help=f"Add {suggestion} to your Unity project"
+                    ):
+                        selected_suggestions.append(suggestion)
+                
+                st.session_state.selected_enhancements[enhancement['category']] = selected_suggestions
+                
+                # Show selection summary
+                if selected_suggestions:
+                    st.success(f"✅ Selected: {', '.join(selected_suggestions)}")
+                else:
+                    st.info("No items selected from this category")
+                
+                st.divider()
         
-        if st.form_submit_button("✅ Confirm Selections", type="primary"):
-            st.success("✅ Enhancements selected! Go to the 'Generate Project' tab to create your Unity project.")
-            st.rerun()
+        # Form submission with better feedback
+        col1, col2 = st.columns([1, 1])
+        with col1:
+            if st.form_submit_button("✅ Confirm Selections", type="primary", help="Save your selections and proceed to project generation"):
+                total_selected = sum(len(suggestions) for suggestions in st.session_state.selected_enhancements.values())
+                if total_selected > 0:
+                    st.success(f"✅ {total_selected} enhancements selected! Go to the 'Generate Project' tab to create your Unity project.")
+                else:
+                    st.warning("⚠️ No enhancements selected. You can still generate a basic Unity project, or go back and select some features!")
+                st.rerun()
+        
+        with col2:
+            if st.form_submit_button("🔄 Reset All", help="Clear all selections and start over"):
+                st.session_state.selected_enhancements = {}
+                st.rerun()
 
 def display_project_generation():
-    """Display project generation interface"""
+    """
+    Display the project generation interface, including selected enhancements,
+    asset generation modal, and download link for the generated Unity project.
+    """
     
     st.markdown("### Selected Enhancements:")
     for category, suggestions in st.session_state.selected_enhancements.items():
@@ -309,7 +508,10 @@ def display_project_generation():
         st.markdown(f"[📦 Download Unity Project]({download_url})", unsafe_allow_html=True)
 
 def generate_unity_project():
-    """Call the backend to generate the Unity project"""
+    """
+    Call the backend to generate the Unity project based on the user's selections.
+    Updates session state with project info and download link.
+    """
     
     with st.spinner("🔨 Generating your Unity project..."):
         try:
@@ -359,15 +561,18 @@ def generate_unity_project():
             st.error(f"❌ Connection error: {str(e)}")
 
 def check_backend_health():
-    """Check if the backend is running"""
+    """
+    Check if the backend server is running and healthy.
+    Returns True if healthy, False otherwise.
+    """
     try:
         response = requests.get(f"{BACKEND_URL}/health", timeout=5)
         return response.status_code == 200
-    except:
+    except Exception as e:
         return False
 
 if __name__ == "__main__":
-    # Check backend health
+    # Check backend health before launching the app
     if not check_backend_health():
         st.error("""
         ❌ **Backend server is not running!**
@@ -379,5 +584,4 @@ if __name__ == "__main__":
         4. Make sure you have set your OPENAI_API_KEY in a .env file
         """)
         st.stop()
-    
     main() 
