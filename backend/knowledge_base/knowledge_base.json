@@ -1,0 +1,85 @@
+{
+  "game_design": {
+    "platformer_mechanics": [
+      "Double jump allows players to reach higher platforms",
+      "Wall jumping enables vertical movement and exploration",
+      "Dash ability provides quick horizontal movement",
+      "Collectibles encourage exploration and replayability",
+      "Checkpoint system reduces frustration and maintains progress"
+    ],
+    "rpg_elements": [
+      "Character progression through experience points",
+      "Inventory system for managing items and equipment",
+      "Quest system for structured gameplay objectives",
+      "Dialogue system for storytelling and character interaction",
+      "Combat mechanics with different attack types"
+    ],
+    "shooter_mechanics": [
+      "Aim and shoot mechanics with mouse/keyboard or controller",
+      "Weapon switching for different combat situations",
+      "Health and armor systems for player survival",
+      "Enemy AI with different behavior patterns",
+      "Cover system for tactical gameplay"
+    ],
+    "puzzle_elements": [
+      "Logic puzzles requiring problem-solving skills",
+      "Physics-based puzzles using game world interactions",
+      "Pattern recognition challenges",
+      "Environmental puzzles using level elements",
+      "Time-based puzzles adding urgency"
+    ]
+  },
+  "unity_specific": {
+    "player_controller": [
+      "Use Input.GetAxis for smooth movement",
+      "Apply forces to Rigidbody for physics-based movement",
+      "Use Transform.Translate for direct position changes",
+      "Implement ground checking with raycasts",
+      "Use Animator for smooth animations"
+    ],
+    "game_management": [
+      "Use GameManager singleton for global game state",
+      "Implement scene management with SceneManager",
+      "Use PlayerPrefs for saving game data",
+      "Create event system for loose coupling",
+      "Use coroutines for time-based actions"
+    ],
+    "ui_systems": [
+      "Use Canvas for UI layout and scaling",
+      "Implement UI Manager for centralized UI control",
+      "Use Text components for displaying information",
+      "Create button interactions with OnClick events",
+      "Use UI animations for smooth transitions"
+    ],
+    "audio_systems": [
+      "Use AudioSource component for sound playback",
+      "Implement AudioManager for centralized audio control",
+      "Use AudioMixer for volume and effects management",
+      "Create sound pools for performance optimization",
+      "Use 3D audio for spatial sound effects"
+    ]
+  },
+  "best_practices": {
+    "code_organization": [
+      "Separate concerns with different script components",
+      "Use inheritance for similar game objects",
+      "Implement interfaces for flexible design",
+      "Use ScriptableObjects for data-driven design",
+      "Follow Unity naming conventions"
+    ],
+    "performance": [
+      "Use object pooling for frequently created objects",
+      "Optimize with LOD (Level of Detail) systems",
+      "Use culling for off-screen objects",
+      "Minimize garbage collection with proper memory management",
+      "Use async operations for non-blocking code"
+    ],
+    "user_experience": [
+      "Provide clear visual feedback for player actions",
+      "Implement smooth camera movement and transitions",
+      "Use consistent input mapping across the game",
+      "Provide accessibility options for different players",
+      "Create intuitive UI with clear navigation"
+    ]
+  }
+}

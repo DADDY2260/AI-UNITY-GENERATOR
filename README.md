@@ -125,8 +125,22 @@ ai-unity-generator/
 
 ## 📚 Documentation
 - **[SETUP.md](SETUP.md):** Detailed setup and troubleshooting guide
+- **[DEPLOYMENT.md](DEPLOYMENT.md):** Complete deployment guide (Docker, Render, Railway, Heroku, VPS)
+- **[QUICK_DEPLOY.md](QUICK_DEPLOY.md):** Quick deployment reference
 - **Backend API:** [http://localhost:8000/docs](http://localhost:8000/docs)
 - **Health Check:** [http://localhost:8000/health](http://localhost:8000/health)
+
+## 🚀 Deployment
+
+This project can be deployed to various platforms:
+
+- **🐳 Docker**: `docker-compose up -d` (see [DEPLOYMENT.md](DEPLOYMENT.md))
+- **☁️ Render**: Free tier available, automatic SSL (see [render.yaml](render.yaml))
+- **🚂 Railway**: Simple deployment with auto-detection
+- **🌐 Heroku**: Traditional PaaS deployment
+- **💻 VPS**: Self-hosted on any Linux server
+
+See **[DEPLOYMENT.md](DEPLOYMENT.md)** for detailed instructions on all deployment methods.
 
 ---
 

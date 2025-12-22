@@ -1,39 +1,58 @@
-# Byte-compiled / optimized / DLL files
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
-
-# Virtual environment
+*.so
+.Python
 venv/
 env/
 ENV/
-.venv/
-.ENV/
+.venv
+*.egg-info/
+dist/
+build/
 
-# VSCode settings
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Generated projects (optional - you may want to track these)
+generated_projects/
+!generated_projects/.gitkeep
+
+# IDE
 .vscode/
+.idea/
+*.swp
+*.swo
+*.sublime-project
+*.sublime-workspace
 
-# OS files
+# OS
 .DS_Store
 Thumbs.db
+*.log
 
-# Python environment files
-*.env
-.env
-.env.*
+# Docker
+*.log
 
-# Unity/IDE files (if any)
-[Ll]ibrary/
-[Tt]emp/
-[Bb]uild/
-[Bb]uilds/
-[Ll]ogs/
-[Oo]bj/
-[Mm]emoryCaptures/
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Unity (if you include Unity projects)
 *.csproj
 *.unityproj
 *.sln
+*.suo
+*.tmp
 *.user
+*.userprefs
 *.pidb
 *.booproj
 *.svd
@@ -41,15 +60,3 @@ Thumbs.db
 *.mdb
 *.opendb
 *.VC.db
-*.pidb.meta
-*.pdb.meta
-*.mdb.meta
-*.opendb.meta
-*.VC.db.meta
-
-# Project output
-*.zip
-
-generated_projects/
-knowledge_base/
-dev_scripts/

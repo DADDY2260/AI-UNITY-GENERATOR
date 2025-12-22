@@ -14,7 +14,8 @@ import time
 from typing import Dict, List, Any
 
 # Configuration
-BACKEND_URL = "http://127.0.0.1:8000"  # Use IP instead of localhost
+import os
+BACKEND_URL = os.getenv("BACKEND_URL", "http://127.0.0.1:8000")  # Use environment variable or default to localhost
 
 def main():
     """
