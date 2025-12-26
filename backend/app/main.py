@@ -245,15 +245,19 @@ async def chat_endpoint(request: ChatRequest):
 Always provide practical, actionable advice with code examples when relevant.
 Keep responses concise but helpful."""
 
-        user_prompt = f"{system_prompt}\n\nUser question: {request.message}\n\nAssistant:"
+        user_prompt = f"User question: {request.message}"
         
-        # Use the game_enhancer's LLM pipeline for generation
-        response = game_enhancer.generator(user_prompt, max_new_tokens=256, temperature=0.7, do_sample=True)
-        content = response[0]["generated_text"]
-        
-        # Extract just the assistant's response (remove the prompt)
-        if "Assistant:" in content:
-            content = content.split("Assistant:")[-1].strip()
+        # Use OpenAI API for chat responses
+        response = game_enhancer.client.chat.completions.create(
+            model=game_enhancer.model,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            temperature=0.7,
+            max_tokens=500
+        )
+        content = response.choices[0].message.content.strip()
         
         # Check for repetitive or poor quality responses
         if (len(content) < 20 or 
