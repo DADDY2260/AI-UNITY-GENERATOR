@@ -6,8 +6,7 @@ Uses OpenAI API with RAG pipeline to suggest improvements to game ideas
 import os
 import json
 from typing import List, Dict, Any
-from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
-import torch
+from openai import OpenAI
 from pydantic import BaseModel
 from ..rag.rag_pipeline import RAGPipeline
 
@@ -18,21 +17,13 @@ class GameEnhancement(BaseModel):
 
 class GameEnhancer:
     def __init__(self):
-        """Initialize the game enhancer with a smaller open model for testing"""
-        # Use a smaller, open model that doesn't require authentication
-        model_name = "distilgpt2"  # Much smaller, open model
-        
-        # Load model and tokenizer (no authentication needed)
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-        
-        # Load model with basic optimization
-        self.model = AutoModelForCausalLM.from_pretrained(
-            model_name, 
-            torch_dtype=torch.float16, 
-            device_map="auto"
-        )
-        # Pipeline for text generation (no device parameter needed with accelerate)
-        self.generator = pipeline("text-generation", model=self.model, tokenizer=self.tokenizer)
+        """Initialize the game enhancer with OpenAI API"""
+        # Initialize OpenAI client
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            raise ValueError("OPENAI_API_KEY environment variable is required")
+        self.client = OpenAI(api_key=api_key)
+        self.model = "gpt-3.5-turbo"  # Lightweight and fast model
 
         # Initialize RAG pipeline for knowledge-augmented generation
         self.rag_pipeline = RAGPipeline()
@@ -59,13 +50,19 @@ class GameEnhancer:
         )
         try:
             # Compose the final prompt for the LLM, including RAG context
-            prompt = (
-                "You are an expert game designer who helps enhance game ideas with creative suggestions. "
-                "Use the provided knowledge base information to give more specific, actionable, and Unity-appropriate suggestions.\n" + enhanced_prompt
+            system_prompt = "You are an expert game designer who helps enhance game ideas with creative suggestions. Use the provided knowledge base information to give more specific, actionable, and Unity-appropriate suggestions."
+            
+            # Generate suggestions using OpenAI API
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": enhanced_prompt}
+                ],
+                temperature=0.8,
+                max_tokens=1500
             )
-            # Generate suggestions using the LLM
-            response = self.generator(prompt, max_new_tokens=1000, temperature=0.8, do_sample=True)
-            content = response[0]["generated_text"]
+            content = response.choices[0].message.content
             # Parse the LLM output into structured enhancements
             enhancements = self._parse_enhancements(content)
             return enhancements
